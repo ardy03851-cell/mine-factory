@@ -123,14 +123,33 @@
       </div>
 
       <div class="resource-card">
-        <div>Gears: <span id="gear-val" class="resource-val">0</span></div>
-        <div id="gear-rate" class="resource-rate">+0/s</div>
-      </div>
+                <div>Gears: <span id="gear-val" class="resource-val">0</span></div>
+                <div id="gear-rate" class="resource-rate">+0/s</div>
+              </div>
 
-      <button id="mine-btn" class="btn">
-                <span>Manual Mine</span>
-                <span class="btn-cost">+1 Ore</span>
-            </button>
+
+
+
+            <div class="resource-card">
+                <div>Coins: <span id="coin-val" class="resource-val">0</span></div>
+                <div id="coin-rate" class="resource-rate">+0/s</div>
+              </div>
+
+
+
+
+            <button id="mine-btn" class="btn">
+                <span>Manual Mine</span>
+                <span class="btn-cost">+1 Ore</span>
+            </button>
+
+
+
+
+            <button id="sell-gear-btn" class="btn">
+                <span>Sell 1 Gear</span>
+                <span class="btn-cost">+10 Coins</span>
+            </button>
 
       <button id="buy-miner-btn" class="btn">
                 <span>Build Miner (<span id="miner-count">0</span>)</span>
@@ -161,7 +180,8 @@
             assembler: { src: 'textures/assembler.png', loaded: false, img: new Image() },
             iron_ore: { src: 'textures/iron_ore.png', loaded: false, img: new Image() },
             iron_ingot: { src: 'textures/iron_ingot.png', loaded: false, img: new Image() },
-            gear: { src: 'textures/gear.png', loaded: false, img: new Image() }
+            gear: { src: 'textures/gear.png', loaded: false, img: new Image() },
+            coin: { src: 'textures/coin.png', loaded: false, img: new Image() }
         };
 
         Object.keys(textures).forEach(key => {
@@ -175,6 +195,7 @@
             ore: 0,
             ingots: 0,
             gears: 0,
+            coins: 0,
             miners: 0,
             smelters: 0,
             assemblers: 0,
@@ -191,6 +212,14 @@
         document.getElementById('mine-btn').addEventListener('click', () => {
             state.ore += 1;
             updateUI();
+        });
+
+        document.getElementById('sell-gear-btn').addEventListener('click', () => {
+            if (state.gears >= 1) {
+                state.gears -= 1;
+                state.coins += 10;
+                updateUI();
+            }
         });
 
         document.getElementById('buy-miner-btn').addEventListener('click', () => {
@@ -252,6 +281,7 @@
             document.getElementById('ore-val').innerText = state.ore;
             document.getElementById('ingot-val').innerText = state.ingots;
             document.getElementById('gear-val').innerText = state.gears;
+            document.getElementById('coin-val').innerText = state.coins;
 
             document.getElementById('miner-count').innerText = state.miners;
             document.getElementById('smelter-count').innerText = state.smelters;
@@ -264,10 +294,12 @@
             document.getElementById('buy-miner-btn').disabled = state.ore < state.costs.miner;
             document.getElementById('buy-smelter-btn').disabled = state.ore < state.costs.smelter;
             document.getElementById('buy-assembler-btn').disabled = state.ingots < state.costs.assembler;
+            document.getElementById('sell-gear-btn').disabled = state.gears < 1;
 
             document.getElementById('ore-rate').innerText = `+${state.miners - state.smelters}/s`;
             document.getElementById('ingot-rate').innerText = `+${state.smelters - (state.assemblers * 2)}/s`;
             document.getElementById('gear-rate').innerText = `+${state.assemblers}/s`;
+            document.getElementById('coin-rate').innerText = `Market`;
         }
 
         function render() {
