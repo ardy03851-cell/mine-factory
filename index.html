@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Factory Idle</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    body {
+      background-color: #121218;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    #game-container {
+      display: flex;
+      gap: 20px;
+      background-color: #1e1e26;
+      padding: 20px;
+      border: 4px solid #3a3a4c;
+      border-radius: 4px;
+      box-shadow: 0 8px 0 #0a0a0f;
+    }
+
+    canvas {
+      background-color: #262633;
+      border: 2px solid #4a4a60;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #ui-panel {
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .resource-card {
+      background-color: #2a2a38;
+      border: 2px solid #3d3d52;
+      padding: 10px;
+      border-radius: 2px;
+    }
+
+    .resource-val {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffcc00;
+      ;
+    }
+
+    .resource-rate {
+      font-size: 12px;
+      color: #8a8a9e;
+    }
+
+    .btn {
+      background-color: #4a6fa5;
+      color: #fff;
+      border: none;
+      border-bottom: 4px solid #2c4366;
+      padding: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn:hover {
+      background-color: #5b82bc;
+    }
+
+    .btn:active {
+      border-bottom-width: 0;
+      margin-top: 4px;
+    }
+
+    .btn:disabled {
+      background-color: #333342;
+      border-bottom-color: #22222b;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .btn-cost {
+      font-size: 11px;
+      color: #ffd700;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="game-container">
+    <canvas id="factoryCanvas" width="384" height="384"></canvas>
+
+    <div id="ui-panel">
+      <h2 style="margin: 0; font-size: 20px; color: #4af;">PIXEL FACTORY</h2>
+
+      <div class="resource-card">
+        <div>Iron Ore: <span id="ore-val" class="resource-val">0</span></div>
+        <div id="ore-rate" class="resource-rate">+0/s</div>
+      </div>
+
+      <div class="resource-card">
+        <div>Iron Ingots: <span id="ingot-val" class="resource-val">0</span></div>
+        <div id="ingot-rate" class="resource-rate">+0/s</div>
+      </div>
+
+      <div class="resource-card">
+        <div>Gears: <span id="gear-val" class="resource-val">0</span></div>
+        <div id="gear-rate" class="resource-rate">+0/s</div>
+      </div>
+
+      <button id="mine-btn" class="btn">
+                <span>Manual Mine</span>
+                <span class="btn-cost">+1 Ore</span>
+            </button>
+
+      <button id="buy-miner-btn" class="btn">
+                <span>Build Miner (<span id="miner-count">0</span>)</span>
+                <span id="miner-cost" class="btn-cost">10 Ore</span>
+            </button>
+
+      <button id="buy-smelter-btn" class="btn">
+                <span>Build Smelter (<span id="smelter-count">0</span>)</span>
+                <span id="smelter-cost" class="btn-cost">20 Ore</span>
+            </button>
+
+      <button id="buy-assembler-btn" class="btn">
+                <span>Build Assembler (<span id="assembler-count">0</span>)</span>
+                <span id="assembler-cost" class="btn-cost">15 Ingots</span>
+            </button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('factoryCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const textures = {
+            conveyor: { src: 'textures/conveyor.png', loaded: false, img: new Image() },
+            miner: { src: 'textures/miner.png', loaded: false, img: new Image() },
+            smelter: { src: 'textures/smelter.png', loaded: false, img: new Image() },
+            assembler: { src: 'textures/assembler.png', loaded: false, img: new Image() },
+            iron_ore: { src: 'textures/iron_ore.png', loaded: false, img: new Image() },
+            iron_ingot: { src: 'textures/iron_ingot.png', loaded: false, img: new Image() },
+            gear: { src: 'textures/gear.png', loaded: false, img: new Image() }
+        };
+
+        Object.keys(textures).forEach(key => {
+            const tex = textures[key];
+            tex.img.src = tex.src;
+            tex.img.onload = () => { tex.loaded = true; };
+            tex.img.onerror = () => { tex.loaded = false; };
+        });
+
+        const state = {
+            ore: 0,
+            ingots: 0,
+            gears: 0,
+            miners: 0,
+            smelters: 0,
+            assemblers: 0,
+            costs: {
+                miner: 10,
+                smelter: 20,
+                assembler: 15
+            }
+        };
+
+        const GRID_SIZE = 6;
+        const TILE_SIZE = 64;
+
+        document.getElementById('mine-btn').addEventListener('click', () => {
+            state.ore += 1;
+            updateUI();
+        });
+
+        document.getElementById('buy-miner-btn').addEventListener('click', () => {
+            if (state.ore >= state.costs.miner) {
+                state.ore -= state.costs.miner;
+                state.miners++;
+                state.costs.miner = Math.floor(state.costs.miner * 1.3);
+                updateUI();
+            }
+        });
+
+        document.getElementById('buy-smelter-btn').addEventListener('click', () => {
+            if (state.ore >= state.costs.smelter) {
+                state.ore -= state.costs.smelter;
+                state.smelters++;
+                state.costs.smelter = Math.floor(state.costs.smelter * 1.4);
+                updateUI();
+            }
+        });
+
+        document.getElementById('buy-assembler-btn').addEventListener('click', () => {
+            if (state.ingots >= state.costs.assembler) {
+                state.ingots -= state.costs.assembler;
+                state.assemblers++;
+                state.costs.assembler = Math.floor(state.costs.assembler * 1.5);
+                updateUI();
+            }
+        });
+
+        let lastTick = performance.now();
+        function gameLoop(time) {
+            const delta = (time - lastTick) / 1000;
+            if (delta >= 1) {
+                tick();
+                lastTick = time;
+            }
+
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function tick() {
+            state.ore += state.miners * 1;
+
+            if (state.smelters > 0 && state.ore >= state.smelters) {
+                state.ore -= state.smelters;
+                state.ingots += state.smelters;
+            }
+
+            if (state.assemblers > 0 && state.ingots >= state.assemblers * 2) {
+                state.ingots -= state.assemblers * 2;
+                state.gears += state.assemblers;
+            }
+
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('ore-val').innerText = state.ore;
+            document.getElementById('ingot-val').innerText = state.ingots;
+            document.getElementById('gear-val').innerText = state.gears;
+
+            document.getElementById('miner-count').innerText = state.miners;
+            document.getElementById('smelter-count').innerText = state.smelters;
+            document.getElementById('assembler-count').innerText = state.assemblers;
+
+            document.getElementById('miner-cost').innerText = state.costs.miner + " Ore";
+            document.getElementById('smelter-cost').innerText = state.costs.smelter + " Ore";
+            document.getElementById('assembler-cost').innerText = state.costs.assembler + " Ingots";
+
+            document.getElementById('buy-miner-btn').disabled = state.ore < state.costs.miner;
+            document.getElementById('buy-smelter-btn').disabled = state.ore < state.costs.smelter;
+            document.getElementById('buy-assembler-btn').disabled = state.ingots < state.costs.assembler;
+
+            document.getElementById('ore-rate').innerText = `+${state.miners - state.smelters}/s`;
+            document.getElementById('ingot-rate').innerText = `+${state.smelters - (state.assemblers * 2)}/s`;
+            document.getElementById('gear-rate').innerText = `+${state.assemblers}/s`;
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const x = c * TILE_SIZE;
+                    const y = r * TILE_SIZE;
+
+                    if (textures.conveyor.loaded) {
+                        ctx.drawImage(textures.conveyor.img, x, y, TILE_SIZE, TILE_SIZE);
+                    } else {
+                        ctx.fillStyle = (r + c) % 2 === 0 ? '#333344' : '#2e2e3e';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+
+            let slot = 0;
+
+            for (let i = 0; i < state.miners; i++) {
+                drawMachine(slot++, textures.miner, '#8a5d3b', 'M');
+            }
+            for (let i = 0; i < state.smelters; i++) {
+                drawMachine(slot++, textures.smelter, '#d95763', 'S');
+            }
+            for (let i = 0; i < state.assemblers; i++) {
+                drawMachine(slot++, textures.assembler, '#5b6ee1', 'A');
+            }
+        }
+
+        function drawMachine(slotIndex, textureObj, fallbackColor, label) {
+            if (slotIndex >= GRID_SIZE * GRID_SIZE) return;
+
+            const col = slotIndex % GRID_SIZE;
+            const row = Math.floor(slotIndex / GRID_SIZE);
+            const x = col * TILE_SIZE;
+            const y = row * TILE_SIZE;
+
+            if (textureObj.loaded) {
+                ctx.drawImage(textureObj.img, x, y, TILE_SIZE, TILE_SIZE);
+            } else {
+                ctx.fillStyle = fallbackColor;
+                ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px monospace';
+                ctx.fillText(label, x + 24, y + 38);
+            }
+        }
+
+        requestAnimationFrame(gameLoop);
+  </script>
+</body>
+
+</html>
